@@ -1,5 +1,5 @@
 import React from "react";
-import { container, PostForm } from "../components";
+import { Container, PostForm } from "../components";
 import { useNavigate } from "react-router-dom";
 
 function AddPost() {

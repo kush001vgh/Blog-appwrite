@@ -1,19 +1,19 @@
-import React from 'react'
-import { container, Logo, LogoutBtn } from '../index'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { useSelector } from 'react-redux'
+import React from "react";
+import { Container, Logo, LogoutBtn } from "../index";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 function Header() {
+  const authStatus = useSelector((state) => state.auth.status);
 
-  const authStatus = useSelector((state) => state.auth.status)
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const navItems = [
     {
-      name: 'Home',
+      name: "Home",
       slug: "/",
-      active: true
+      active: true,
     },
     {
       name: "Login",
@@ -35,7 +35,7 @@ function Header() {
       slug: "/add-post",
       active: authStatus,
     },
-  ]
+  ];
 
   return (
     <header
@@ -51,10 +51,7 @@ function Header() {
         shadow-lg
       "
     >
-
-      <Container>
-
-        <nav
+      <Container> <nav
           className="
             flex
             items-center
@@ -99,7 +96,6 @@ function Header() {
 
           </div>
 
-
           {/* ================= NAVIGATION ================= */}
 
           <ul
@@ -113,7 +109,6 @@ function Header() {
 
             {navItems.map((item) =>
               item.active ? (
-
                 <li key={item.name}>
 
                   <button
@@ -147,31 +142,23 @@ function Header() {
                   </button>
 
                 </li>
-
               ) : null
             )}
-
 
             {/* ================= LOGOUT ================= */}
 
             {authStatus && (
-
               <li className="ml-1 sm:ml-2">
-
                 <LogoutBtn />
-
               </li>
-
             )}
 
           </ul>
 
         </nav>
-
-      </Container>
-
+</Container>
     </header>
-  )
+  );
 }
 
-export default Header
+export default Header;
