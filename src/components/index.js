@@ -15,7 +15,7 @@ import Input from "./Input";
 export {
     Header,
     Footer,
-    container,
+    Container,
     Logo,
     LogoutBtn,
     RTE,
