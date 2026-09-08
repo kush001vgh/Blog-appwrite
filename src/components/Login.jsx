@@ -249,7 +249,7 @@ function Login() {
                                             type="submit"
                                             className="w-full py-3 rounded-xl text-base font-semibold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300"
                                         >
-                                            Sign In
+                                            Login
                                         </Button>
 
                                     </div>
