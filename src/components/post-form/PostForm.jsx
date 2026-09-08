@@ -1,11 +1,11 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Button, Input, RTE, Select } from "..";
 import appwriteService from "../../appwrite/config";
+import authService from "../../appwrite/auth";
 import { useNavigate } from "react-router-dom";
-import { useSelector } from "react-redux";
 
-export default function PostForm({ post }) {
+export default function PostForm({ post, onSuccess }) {
     const {
         register,
         handleSubmit,
@@ -24,17 +24,31 @@ export default function PostForm({ post }) {
 
     const navigate = useNavigate();
 
-    const userData = useSelector(
-        (state) => state.auth.userData
-    );
-
     const submit = async (data) => {
         try {
             console.log("Form Data:", data);
 
+            // --------------------------------
+            // CHECK CURRENT APPWRITE USER
+            // --------------------------------
+            const currentUser = await authService.getCurrentUser();
+
+            console.log("Current User:", currentUser);
+
+            if (!currentUser?.$id) {
+                console.log("User is not logged in");
+                alert("Please login before creating a post.");
+                navigate("/login");
+                return;
+            }
+
+            // ==================================
+            // UPDATE POST
+            // ==================================
             if (post) {
                 let file = null;
 
+                // Upload new image if selected
                 if (data.image && data.image.length > 0) {
                     file = await appwriteService.uploadFile(
                         data.image[0]
@@ -45,6 +59,7 @@ export default function PostForm({ post }) {
                         return;
                     }
 
+                    // Delete old image
                     if (post.featuredImage) {
                         await appwriteService.deleteFile(
                             post.featuredImage
@@ -52,16 +67,15 @@ export default function PostForm({ post }) {
                     }
                 }
 
-                const dbPost =
-                    await appwriteService.updatePost(
-                        post.$id,
-                        {
-                            ...data,
-                            featuredImage: file
-                                ? file.$id
-                                : post.featuredImage,
-                        }
-                    );
+                const dbPost = await appwriteService.updatePost(
+                    post.$id,
+                    {
+                        ...data,
+                        featuredImage: file
+                            ? file.$id
+                            : post.featuredImage,
+                    }
+                );
 
                 if (dbPost) {
                     console.log(
@@ -69,77 +83,92 @@ export default function PostForm({ post }) {
                         dbPost
                     );
 
+                    if (onSuccess) {
+                        onSuccess(dbPost);
+                    } else {
+                        navigate(`/post/${dbPost.$id}`);
+                    }
+                }
+
+                return;
+            }
+
+            // ==================================
+            // CREATE NEW POST
+            // ==================================
+
+            // Image required
+            if (
+                !data.image ||
+                data.image.length === 0
+            ) {
+                console.log(
+                    "Please select a featured image"
+                );
+
+                alert("Please select a featured image.");
+                return;
+            }
+
+            console.log("Uploading image...");
+
+            const file = await appwriteService.uploadFile(
+                data.image[0]
+            );
+
+            if (!file) {
+                console.log("Image upload failed");
+                return;
+            }
+
+            console.log("Image uploaded:", file);
+
+            const fileId = file.$id;
+
+            console.log("Creating post...");
+
+            const dbPost = await appwriteService.createPost({
+                title: data.title,
+                slug: data.slug,
+                content: data.content,
+                status: data.status,
+                featuredImage: fileId,
+
+                // IMPORTANT
+                userId: currentUser.$id,
+            });
+
+            if (dbPost) {
+                console.log(
+                    "Post created successfully:",
+                    dbPost
+                );
+
+                if (onSuccess) {
+                    onSuccess(dbPost);
+                } else {
                     navigate(`/post/${dbPost.$id}`);
                 }
             } else {
-                if (!userData?.$id) {
-                    console.log("User is not logged in");
-                    return;
-                }
-
-                if (
-                    !data.image ||
-                    data.image.length === 0
-                ) {
-                    console.log(
-                        "Please select a featured image"
-                    );
-                    return;
-                }
-
-                console.log("Uploading image...");
-
-                const file =
-                    await appwriteService.uploadFile(
-                        data.image[0]
-                    );
-
-                if (!file) {
-                    console.log("Image upload failed");
-                    return;
-                }
-
-                console.log(
-                    "Image uploaded:",
-                    file
-                );
-
-                const fileId = file.$id;
-
-                console.log("Creating post...");
-
-                const dbPost =
-                    await appwriteService.createPost({
-                        title: data.title,
-                        slug: data.slug,
-                        content: data.content,
-                        status: data.status,
-                        featuredImage: fileId,
-                        userId: userData.$id,
-                    });
-
-                if (dbPost) {
-                    console.log(
-                        "Post created successfully:",
-                        dbPost
-                    );
-
-                    navigate(
-                        `/post/${dbPost.$id}`
-                    );
-                } else {
-                    console.log(
-                        "Post creation failed"
-                    );
-                }
+                console.log("Post creation failed");
             }
+
         } catch (error) {
             console.error(
                 "PostForm :: submit :: error",
                 error
             );
+
+            alert(
+                error?.message ||
+                "Something went wrong while creating the post."
+            );
         }
     };
+
+    // ==================================
+    // SLUG TRANSFORM
+    // ==================================
 
     const slugTransform = useCallback(
         (value) => {
@@ -159,7 +188,11 @@ export default function PostForm({ post }) {
         []
     );
 
-    React.useEffect(() => {
+    // ==================================
+    // AUTO GENERATE SLUG
+    // ==================================
+
+    useEffect(() => {
         const subscription = watch(
             (value, { name }) => {
                 if (name === "title") {
@@ -189,11 +222,16 @@ export default function PostForm({ post }) {
         >
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-7">
 
+                {/* ==================================
+                    LEFT SIDE
+                ================================== */}
+
                 <div className="lg:col-span-2 space-y-6">
 
                     <div className="bg-white rounded-2xl p-5 md:p-7 shadow-lg border border-gray-200">
 
                         <div className="mb-6">
+
                             <p className="text-xs uppercase tracking-[4px] text-blue-500 font-semibold">
                                 Article Information
                             </p>
@@ -205,7 +243,10 @@ export default function PostForm({ post }) {
                             <p className="text-gray-500 text-sm mt-2">
                                 Add a title and create the content of your post.
                             </p>
+
                         </div>
+
+                        {/* TITLE */}
 
                         <Input
                             label="Title"
@@ -215,6 +256,8 @@ export default function PostForm({ post }) {
                                 required: true,
                             })}
                         />
+
+                        {/* SLUG */}
 
                         <Input
                             label="Slug"
@@ -236,30 +279,40 @@ export default function PostForm({ post }) {
                             }}
                         />
 
+                        {/* RTE */}
+
                         <div className="rounded-xl border border-gray-200 overflow-hidden">
+
                             <RTE
                                 label="Content"
                                 name="content"
                                 control={control}
                                 defaultValue={getValues("content")}
                             />
+
                         </div>
 
                     </div>
 
                 </div>
 
+                {/* ==================================
+                    RIGHT SIDE
+                ================================== */}
+
                 <div className="space-y-6">
 
                     <div className="bg-white rounded-2xl p-5 md:p-6 shadow-lg border border-gray-200">
 
                         <div className="mb-5">
-                            
 
                             <h3 className="text-xl font-bold text-gray-800 mt-2">
                                 Publish Details
                             </h3>
+
                         </div>
+
+                        {/* IMAGE */}
 
                         <Input
                             label="Featured Image"
@@ -271,6 +324,8 @@ export default function PostForm({ post }) {
                             })}
                         />
 
+                        {/* CURRENT IMAGE */}
+
                         {post && post.featuredImage && (
                             <div className="mb-5">
 
@@ -279,6 +334,7 @@ export default function PostForm({ post }) {
                                 </p>
 
                                 <div className="rounded-xl overflow-hidden border border-gray-200 shadow-sm">
+
                                     <img
                                         src={
                                             appwriteService.getFilePreview(
@@ -288,10 +344,13 @@ export default function PostForm({ post }) {
                                         alt={post.title}
                                         className="w-full h-48 object-cover hover:scale-105 transition-transform duration-500"
                                     />
+
                                 </div>
 
                             </div>
                         )}
+
+                        {/* STATUS */}
 
                         <Select
                             options={[
@@ -304,6 +363,8 @@ export default function PostForm({ post }) {
                                 required: true,
                             })}
                         />
+
+                        {/* BUTTON */}
 
                         <Button
                             type="submit"
@@ -320,6 +381,8 @@ export default function PostForm({ post }) {
                         </Button>
 
                     </div>
+
+                    {/* TIPS */}
 
                     <div className="bg-slate-900 rounded-2xl p-6 text-white shadow-lg">
 
